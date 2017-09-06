@@ -12,22 +12,22 @@ int main(void) {
       parse_rx_buf(&cmd);
       switch (cmd.opcode) {
         case CMD_SEND_BTLDR_VERS: {
-          send_ans(ANS_BOOTLOADER_VERSION, version_string, sizeof(version_string));
+          send_ans(CMD_SEND_BTLDR_VERS, version_string, sizeof(version_string));
           break;
         }
         case CMD_WRITE_FLASH_PAGE: {
           cbc_decrypt(cmd.data, cmd.datalen / CIPH_BLOCK_LEN);
-          uint32_t *pcrc32_ = (uint32_t *)(cmd.data + AVR_FLASH_PAGESIZE);
-          uint16_t *ppage_no = (uint16_t *)(cmd.data + AVR_FLASH_PAGESIZE + sizeof(*pcrc32_));
+          uint32_t *pcrc32_ = (uint32_t *)(cmd.data + SPM_PAGESIZE);
+          uint16_t *ppage_no = (uint16_t *)(cmd.data + SPM_PAGESIZE + sizeof(*pcrc32_));
           if (*pcrc32_ == crc32(cmd.data, AVR_FLASH_PAGESIZE)) {
             boot_program_page(*ppage_no, cmd.data);
           }
-          // CRC8
+          send_ans(CMD_WRITE_FLASH_PAGE, NULL, 0)
           break;
         }
         case CMD_INIT_CIPHER: {
           cbc_init();
-          send_ans(ANS_CIPHER_INITIALIZED, NULL, 0);
+          send_ans(CMD_INIT_CIPHER, NULL, 0);
           break;
         }
         case CMD_NOTHING_TO_DO:
@@ -46,7 +46,7 @@ void init(void) {
   asm("sei");
 }
 
-void send_ans(ans_opcode_t opcode, const uint8_t *data, uint8_t datalen) {
+void send_ans(cmd_opcode_t opcode, const uint8_t *data, uint8_t datalen) {
   uint8_t crc;
   USART_tx_buf_put((const uint8_t *)&datalen, sizeof(datalen));
   crc = crc8(crc, (const uint8_t *)&datalen, sizeof(datalen));

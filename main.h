@@ -25,16 +25,10 @@
 
 typedef enum {
   CMD_SEND_BTLDR_VERS = 0x01,
-  CMD_WRITE_FLASH_PAGE,
   CMD_INIT_CIPHER,
+  CMD_WRITE_FLASH_PAGE,
   CMD_NOTHING_TO_DO
 } cmd_opcode_t;
-
-typedef enum {
-  ANS_CIPHER_INITIALIZED = 0x01,
-  ANS_FLASH_PAGE_WRITTEN,
-  ANS_BOOTLOADER_VERSION
-} ans_opcode_t;
 
 typedef struct {
   cmd_opcode_t opcode;
