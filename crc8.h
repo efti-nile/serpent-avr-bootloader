@@ -3,5 +3,7 @@
 #ifndef CRC8_H_
 #define CRC8_H_
 
-unsigned char crc8(const unsigned char *data, unsigned char len);
+#include <inttypes.h>
+
+unsigned char crc8(uint8_t crc, const uint8_t *data, uint8_t len);
 #endif
