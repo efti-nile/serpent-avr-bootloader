@@ -30,8 +30,14 @@ typedef enum {
   CMD_NOTHING_TO_DO
 } cmd_opcode_t;
 
+typedef enum {
+  ANS_CIPHER_INITIALIZED = 0x01,
+  ANS_FLASH_PAGE_WRITTEN,
+  ANS_BOOTLOADER_VERSION
+} ans_opcode_t;
+
 typedef struct {
-  cmd_opcode_t cmd_opcode;
+  cmd_opcode_t opcode;
   uint8_t datalen;
   uint8_t data[LIN_DATA_MAXLEN];
 } cmd_t;
@@ -39,6 +45,7 @@ typedef struct {
 #define LIN_ADD 0x02 // CONFIGURABLE Device LIN-address
 
 void init(void);
+void send_ans(ans_opcode_t opcode, const uint8_t *data, uint8_t datalen);
 void parse_rx_buf(cmd_t *pcmd);
 uint8_t verify_fw(void);
 

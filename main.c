@@ -10,12 +10,9 @@ int main(void) {
   while (1) {
     if (is_cmd_received) {
       parse_rx_buf(&cmd);
-      switch (cmd.cmd_opcode) {
+      switch (cmd.opcode) {
         case CMD_SEND_BTLDR_VERS: {
-          DDRB |= 0x08; PORTB ^= 0x08;
-          uint8_t crc8_ = crc8(version_string, sizeof(version_string));
-          USART_tx_buf_put(version_string, sizeof(version_string));
-          USART_tx_buf_put(&crc8_, 1);
+          send_ans(ANS_BOOTLOADER_VERSION, version_string, sizeof(version_string));
           break;
         }
         case CMD_WRITE_FLASH_PAGE: {
@@ -30,6 +27,7 @@ int main(void) {
         }
         case CMD_INIT_CIPHER: {
           cbc_init();
+          send_ans(ANS_CIPHER_INITIALIZED, NULL, 0);
           break;
         }
         case CMD_NOTHING_TO_DO:
@@ -48,6 +46,17 @@ void init(void) {
   asm("sei");
 }
 
+void send_ans(ans_opcode_t opcode, const uint8_t *data, uint8_t datalen) {
+  uint8_t crc;
+  USART_tx_buf_put((const uint8_t *)&datalen, sizeof(datalen));
+  crc = crc8(crc, (const uint8_t *)&datalen, sizeof(datalen));
+  USART_tx_buf_put((const uint8_t *)&opcode, sizeof(opcode));
+  crc = crc8(crc, (const uint8_t *)&opcode, sizeof(opcode));
+  USART_tx_buf_put(data, datalen);
+  crc = crc8(crc, data, datalen);
+  USART_tx_buf_put(&crc, 1);
+}
+
 void parse_rx_buf(cmd_t *pcmd) {
   uint8_t num_bytes_wrote, msg_datalen, msg_len, msg_crc8;
   uint8_t buf[LIN_MSG_MAXLEN];
@@ -56,14 +65,14 @@ void parse_rx_buf(cmd_t *pcmd) {
   msg_len = LIN_MSG_MAXLEN - LIN_DATA_MAXLEN + msg_datalen;
   if (num_bytes_wrote == msg_len) {
     msg_crc8 = buf[msg_len - 1];
-    if (msg_crc8 == crc8(buf, msg_len - 1)) {
-      pcmd->cmd_opcode = (cmd_opcode_t) buf[2];
+    if (msg_crc8 == crc8(0x00, buf, msg_len - 1)) {
+      pcmd->opcode = (cmd_opcode_t) buf[2];
       pcmd->datalen = msg_datalen;
       memcpy(pcmd->data, buf + 3, msg_datalen);
       return;
     }
   }
-  pcmd->cmd_opcode = CMD_NOTHING_TO_DO; // Parsing failed
+  pcmd->opcode = CMD_NOTHING_TO_DO; // Parsing failed
 }
 
 ISR(TIMER1_COMPA_vect) {
