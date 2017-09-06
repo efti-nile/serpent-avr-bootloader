@@ -4,6 +4,10 @@
 volatile uint8_t is_cmd_received = 0;
 volatile uint16_t tmp1, tmp2, tmp3, tmp4;
 
+// TODO
+// 1. Выяснить, где хранится CRC16 и по какую душу она считается
+// 2. Таймаут завести: если в течение 5 секунд нету новых фреймов, заканчиваем и проверяем.
+
 int main(void) {
   cmd_t cmd;
   init();
@@ -20,9 +24,16 @@ int main(void) {
           uint32_t *pcrc32_ = (uint32_t *)(cmd.data + SPM_PAGESIZE);
           uint16_t *ppage_no = (uint16_t *)(cmd.data + SPM_PAGESIZE + sizeof(*pcrc32_));
           if (*pcrc32_ == crc32(cmd.data, AVR_FLASH_PAGESIZE)) {
+            if (*ppage_no == SN_PAGE) { // If received page rewrites device serial number...
+              for (uint8_t i = 0; i < SN_LEN; i++) { // ...copy serial number from device flash
+                cmd.data[SN_ADD % SPM_PAGESIZE + i] = pgm_read_byte_near(SN_ADD + i);
+              }
+            }
             boot_program_page(*ppage_no, cmd.data);
+            send_ans(CMD_WRITE_FLASH_PAGE, NULL, 0);
+          } else {
+            send_ans(ERR_CRC32_INCORRECT, NULL, 0);
           }
-          send_ans(CMD_WRITE_FLASH_PAGE, NULL, 0)
           break;
         }
         case CMD_INIT_CIPHER: {
