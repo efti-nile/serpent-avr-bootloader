@@ -12,7 +12,7 @@
 #include "crc32.h"
 #include "crc8.h"
 #include "avr-flash.h"
-
+ 
 ///
 // LIN-address
 #define LIN_ADD 0x02 // CONFIGURABLE
