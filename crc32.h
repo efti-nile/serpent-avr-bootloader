@@ -3,6 +3,6 @@
 
 #include <inttypes.h>
 
-uint32_t crc32 (unsigned char *buffer, int length);
+uint32_t crc32(const uint8_t *data, uint8_t len);
 
 #endif

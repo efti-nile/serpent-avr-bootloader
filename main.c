@@ -2,11 +2,6 @@
 #include "version-string.inc"
 
 volatile uint8_t is_cmd_received = 0;
-volatile uint16_t tmp1, tmp2, tmp3, tmp4;
-
-// TODO
-// 1. Выяснить, где хранится CRC16 и по какую душу она считается
-// 2. Таймаут завести: если в течение 5 секунд нету новых фреймов, заканчиваем и проверяем.
 
 int main(void) {
   cmd_t cmd;
@@ -21,9 +16,9 @@ int main(void) {
         }
         case CMD_WRITE_FLASH_PAGE: {
           cbc_decrypt(cmd.data, cmd.datalen / CIPH_BLOCK_LEN);
-          uint32_t *pcrc32_ = (uint32_t *)(cmd.data + SPM_PAGESIZE);
-          uint16_t *ppage_no = (uint16_t *)(cmd.data + SPM_PAGESIZE + sizeof(*pcrc32_));
-          if (*pcrc32_ == crc32(cmd.data, AVR_FLASH_PAGESIZE)) {
+          uint16_t *ppage_no = (uint16_t *)(cmd.data + SPM_PAGESIZE);
+          uint32_t *pcrc32 = (uint32_t *)(cmd.data + SPM_PAGESIZE + sizeof(*ppage_no));
+          if (*pcrc32 == crc32(cmd.data, SPM_PAGESIZE + sizeof(*ppage_no))) {
             if (*ppage_no == SN_PAGE) { // If received page rewrites device serial number...
               for (uint8_t i = 0; i < SN_LEN; i++) { // ...copy serial number from device flash
                 cmd.data[SN_ADD % SPM_PAGESIZE + i] = pgm_read_byte_near(SN_ADD + i);
@@ -58,7 +53,9 @@ void init(void) {
 }
 
 void send_ans(cmd_opcode_t opcode, const uint8_t *data, uint8_t datalen) {
-  uint8_t crc;
+  uint8_t crc = 0x00, lin_add = LIN_ADD;
+  USART_tx_buf_put((const uint8_t *)&lin_add, sizeof(lin_add));
+  crc = crc8(crc, (const uint8_t *)&lin_add, sizeof(lin_add));
   USART_tx_buf_put((const uint8_t *)&datalen, sizeof(datalen));
   crc = crc8(crc, (const uint8_t *)&datalen, sizeof(datalen));
   USART_tx_buf_put((const uint8_t *)&opcode, sizeof(opcode));

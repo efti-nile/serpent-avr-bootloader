@@ -12,6 +12,10 @@
 #include "crc32.h"
 #include "crc8.h"
 #include "avr-flash.h"
+
+#ifdef DEBUG
+#warning Bootloader set in debug mode! It wont work properly!
+#endif
  
 ///
 // LIN-address
@@ -24,7 +28,7 @@
 // Otherwise it won't be proper restored after firmware upgrade!
 #define SN_ADD  0xC0 // CONFIGURABLE 
 #define SN_LEN  16 // CONFIGURABLE 
-#define SN_PAGE (SN_ADDRESS/SPM_PAGESIZE)
+#define SN_PAGE (SN_ADD/SPM_PAGESIZE)
 
 ///
 // CRC16 location
@@ -55,7 +59,7 @@ typedef struct {
 } cmd_t;
 
 void init(void);
-void send_ans(ans_opcode_t opcode, const uint8_t *data, uint8_t datalen);
+void send_ans(cmd_opcode_t opcode, const uint8_t *data, uint8_t datalen);
 void parse_rx_buf(cmd_t *pcmd);
 uint8_t verify_fw(void);
 

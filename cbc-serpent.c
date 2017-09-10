@@ -16,7 +16,6 @@ void cbc_decrypt(unsigned char *src, unsigned char num_blocks_to_decrypt) {
     swap = acc;
     acc = buf;
     buf = swap;
-    memxor(acc, src + i*CIPH_BLOCK_LEN, CIPH_BLOCK_LEN);
   }
 }
 

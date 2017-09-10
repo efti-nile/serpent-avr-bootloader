@@ -6,7 +6,7 @@
 #include <avr/interrupt.h>
 
 #define USART_BAUD (9600)
-#define USART_CIRBUF_RX_LEN (256) // Must be power-of-two and less than 256!
+#define USART_CIRBUF_RX_LEN (512) // Must be power-of-two and less than 256!
 #define USART_CIRBUF_TX_LEN (64) // Must be power-of-two and less than 256!
 
 // #define USART_DEFAULT_RX_IRC // Uncomment to use default RX IRC
