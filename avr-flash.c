@@ -3,7 +3,7 @@
 // Used source from http://www.nongnu.org/avr-libc/user-manual/group__avr__boot.html
 void boot_program_page (uint16_t page_no, uint8_t *buf) {
   uint8_t sreg;
-  uint16_t page = APP_OFFSET + page_no * SPM_PAGESIZE;
+  uint16_t page = page_no * SPM_PAGESIZE;
   // Disable interrupts.
   sreg = SREG;
   cli();
