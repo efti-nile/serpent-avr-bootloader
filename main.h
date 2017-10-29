@@ -14,7 +14,11 @@
 #include "avr-flash.h"
 
 #ifdef DEBUG
-#warning Bootloader set in debug mode! It wont work properly!
+#warning Set DEBUG symbol. Bootloader want work properly.
+#endif
+
+#ifdef STUB
+#warning Set STUB symbol. Bootloader want work properly.
 #endif
  
 ///
@@ -62,5 +66,6 @@ void init(void);
 void send_ans(cmd_opcode_t opcode, const uint8_t *data, uint8_t datalen);
 void parse_rx_buf(cmd_t *pcmd);
 uint8_t verify_fw(void);
+void stub(void);
 
 #endif

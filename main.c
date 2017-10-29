@@ -4,6 +4,11 @@
 volatile uint8_t is_cmd_received = 0;
 
 int main(void) {
+  MCUCR = (1<<IVCE);
+  MCUCR = (1<<IVSEL);
+#ifdef STUB
+  stub();  // Infinite loop for debug purpose
+#endif
   cmd_t cmd;
   init();
   while (1) {
@@ -95,7 +100,7 @@ ISR(USART_RX_vect) {
   if ((TCCR1B & 0x07) == 0x00) { // if timer doesn't run
     if (rx_byte == LIN_ADD) { // if device address received
 	    // OCR1A = 4818;
-      TIMSK1 |= 1 << OCIE1A; // enable timer 0 overflow interrupt
+      TIMSK1 |= 1 << OCIE1A; // enable timer A compare interrupt
       OCR1A =  (uint16_t)(((double)LIN_MSG_MAXLEN * 2.0 * 10.0 / (double)USART_BAUD)\
         * ((double)F_CPU / 1024.0)); // set timeout
       TCCR1B |= 0x05; // start timer at F_CPU/1024. Overflow every ~16 ms @ F_CPU == 16 MHz
@@ -103,5 +108,24 @@ ISR(USART_RX_vect) {
     }
   } else {
     USART_rx_buf_put((uint8_t const *)&rx_byte, 1);
+  }
+}
+
+void stub(void) {
+  DDRC |= 1 << PC2 | 1 << PC3;
+  asm("sei");
+  TIMSK1 |= 1 << OCIE1A;  // enable timer 0 compare interrupt
+  OCR1A = (uint16_t) ((double)F_CPU / 1024.0); // for 1 s @ F_CPU == 16 MHz && 1024 prescaler
+  TCCR1B |= 0x05; // start timer at F_CPU/1024
+  for (uint8_t i = 0; ; i++) {
+    if (is_cmd_received) {
+        is_cmd_received = 0;
+        PORTC ^= 1 << PC3;
+        TCCR1B |= 0x05;
+    }
+    if (!i) {
+      PORTC ^=  1 << PC2;
+    }
+    _delay_ms(1);
   }
 }
