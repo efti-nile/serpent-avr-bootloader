@@ -47,6 +47,7 @@ int main(void) {
       }
       USART_rx_buf_purge();
       is_cmd_received = 0;
+      USART_enable_receiver();
     }
   }
   return 0;
@@ -93,6 +94,7 @@ ISR(TIMER1_COMPA_vect) {
   TCNT1 = 0x0000; // zero timer
   TIFR1 |= 1 << OCF1A; // clear timer 1 comparator interrupt flag
   is_cmd_received = 1;
+  USART_disable_receiver();
 }
 
 ISR(USART_RX_vect) {

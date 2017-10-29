@@ -44,6 +44,14 @@ ISR(USART_TX_vect) {
 }
 #endif
 
+void USART_disable_receiver(void) {
+  UCSR0B &= ~(1 << RXEN0);
+}
+
+void USART_enable_receiver(void) {
+  UCSR0B |= 1 << RXEN0;
+}
+
 // Get bytes from RX circular buffer. Returns number of read bytes.
 unsigned char USART_rx_buf_get(unsigned char *src, unsigned char num) {
   unsigned char num_read = 0;

@@ -17,6 +17,8 @@
 
 void USART_init(void);
 
+void USART_disable_receiver(void);
+void USART_enable_receiver(void);
 unsigned char USART_rx_buf_get(unsigned char *src, unsigned char num);
 unsigned char USART_rx_buf_put(const unsigned char *src, unsigned char num);
 unsigned char USART_is_rx_buf_emtpty(void);
