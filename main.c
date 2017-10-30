@@ -1,16 +1,21 @@
 #include "main.h"
 #include "version-string.inc"
 
+__flash const uint8_t *pred_key = (__flash const uint16_t *)REDKEY_ADD;
+__flash const uint16_t *papp_crc = (__flash const uint16_t *)CRC_ADD;
+__flash const uint16_t *papp_len = (__flash const uint16_t *)APP_SIZE_ADD;
+
 volatile uint8_t is_cmd_received = 0;
 
 int main(void) {
-  MCUCR = (1<<IVCE);
-  MCUCR = (1<<IVSEL);
+  cmd_t cmd;
 #ifdef STUB
   stub();  // Infinite loop for debug purpose
 #endif
-  cmd_t cmd;
   init();
+  if (verify_app()) {
+    app_countdown_start();
+  }
   while (1) {
     if (is_cmd_received) {
       parse_rx_buf(&cmd);
@@ -24,9 +29,9 @@ int main(void) {
           uint16_t *ppage_no = (uint16_t *)(cmd.data + SPM_PAGESIZE);
           uint32_t *pcrc32 = (uint32_t *)(cmd.data + SPM_PAGESIZE + sizeof(*ppage_no));
           if (*pcrc32 == crc32(cmd.data, SPM_PAGESIZE + sizeof(*ppage_no))) {
-            if (*ppage_no == SN_PAGE) { // If received page rewrites device serial number...
-              for (uint8_t i = 0; i < SN_LEN; i++) { // ...copy serial number from device flash
-                cmd.data[SN_ADD % SPM_PAGESIZE + i] = pgm_read_byte_near(SN_ADD + i);
+            if (*ppage_no == REDKEY_PAGE) { // If received page rewrites device serial number...
+              for (uint8_t i = 0; i < REDKEY_LEN; i++) { // ...copy serial number from device flash
+                cmd.data[REDKEY_ADD % SPM_PAGESIZE + i] = *(pred_key + 1);
               }
             }
             boot_program_page(*ppage_no, cmd.data);
@@ -39,6 +44,10 @@ int main(void) {
         case CMD_INIT_CIPHER: {
           cbc_init();
           send_ans(CMD_INIT_CIPHER, NULL, 0);
+          break;
+        }
+        case CMD_KEEP_ALIVE: {
+          app_countdown_stop();
           break;
         }
         case CMD_NOTHING_TO_DO:
@@ -54,8 +63,27 @@ int main(void) {
 }
 
 void init(void) {
+  MCUCR = (1<<IVCE);
+  MCUCR = (1<<IVSEL);
   USART_init();
   asm("sei");
+}
+
+uint8_t verify_app(void) {
+  uint16_t crc = 0xFFFF;
+  if (*papp_len > APP_MAXSIZE) {
+    return 0;
+  }
+  for (uint16_t add = 0; add < *papp_len; add += 2) {
+    uint16_t buf;
+    if (add == INFO_BEGIN) {
+      add = INFO_END + 1;  // Skip INFO-block
+    }
+    buf = *((__flash const uint16_t *) add);
+    crc = crc16(crc, (const uint8_t *)&buf, sizeof(uint16_t));
+  }
+  crc = crc >> 8 | crc << 8;
+  return crc == *papp_crc;
 }
 
 void send_ans(cmd_opcode_t opcode, const uint8_t *data, uint8_t datalen) {
@@ -113,7 +141,28 @@ ISR(USART_RX_vect) {
   }
 }
 
+ISR(TIMER0_COMPA_vect) {
+  static uint16_t countdown = APP_COUNTDOWN;
+  if (countdown-- == 0) {
+    DDRC |= 1 << PC2;
+    PORTC |= 1 << PC2;
+  }
+  TCNT0 = 0x00;
+}
+
+void app_countdown_start(void) {
+  TIMSK0 = 1 << OCIE0A;
+  OCR0A = (uint8_t) ((double)F_CPU / 1024.0 / 100.0); // 10 ms @ F_CPU == 16 MHz && 1024 prescaler
+  TCCR0B = 0x05; // start timer at F_CPU/1024
+}
+
+void app_countdown_stop(void) {
+  TCCR0B = 0x00;
+}
+
 void stub(void) {
+  MCUCR = (1<<IVCE);
+  MCUCR = (1<<IVSEL);
   DDRC |= 1 << PC2 | 1 << PC3;
   asm("sei");
   TIMSK1 |= 1 << OCIE1A;  // enable timer 0 compare interrupt
