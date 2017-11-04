@@ -144,8 +144,11 @@ ISR(USART_RX_vect) {
 ISR(TIMER0_COMPA_vect) {
   static uint16_t countdown = APP_COUNTDOWN;
   if (countdown-- == 0) {
-    DDRC |= 1 << PC2;
-    PORTC |= 1 << PC2;
+    _delay_ms(200);
+    asm("cli");
+    MCUCR = 1 << IVCE;
+    MCUCR = 0;
+    asm("jmp 0000");
   }
   TCNT0 = 0x00;
 }

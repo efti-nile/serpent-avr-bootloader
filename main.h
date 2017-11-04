@@ -24,8 +24,6 @@
 
 #define APP_COUNTDOWN 500  // Delay before branch to the application, * 10 ms
 
-
-
 ///
 // INFO-block
 #define INFO_BEGIN 0x80
@@ -36,7 +34,7 @@
 // Red key must be contained in one single flash page!
 // Otherwise it won't be proper restored after firmware upgrade!
 #define REDKEY_ADD 0xC0 // CONFIGURABLE 
-#define REDKEY_LEN 4 // CONFIGURABLE 
+#define REDKEY_LEN 0 // CONFIGURABLE 
 #define REDKEY_PAGE (REDKEY_ADD/SPM_PAGESIZE)
 
 ///
