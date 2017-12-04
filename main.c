@@ -9,12 +9,19 @@ volatile uint8_t is_cmd_received = 0;
 
 int main(void) {
   cmd_t cmd;
+  LED_DDR |= LED_PIN_MASK;
+  for (uint8_t i = 0; i < 10; ++i) {
+    LED_PORT ^= LED_PIN_MASK;
+    _delay_ms(100);
+  }
 #ifdef STUB
-  stub();  // Infinite loop for debug purpose
+  stub();  // Infinite loop for debug purposes
 #endif
   init();
   if (verify_app()) {
     app_countdown_start();
+  } else {
+    PORTC |= LED_PIN_MASK;
   }
   while (1) {
     if (is_cmd_received) {
@@ -29,12 +36,12 @@ int main(void) {
           uint16_t *ppage_no = (uint16_t *)(cmd.data + SPM_PAGESIZE);
           uint32_t *pcrc32 = (uint32_t *)(cmd.data + SPM_PAGESIZE + sizeof(*ppage_no));
           if (*pcrc32 == crc32(cmd.data, SPM_PAGESIZE + sizeof(*ppage_no))) {
-            if (*ppage_no == REDKEY_PAGE) { // If received page rewrites device serial number...
+            if (*ppage_no == REDKEY_PAGE) {  // If received page rewrites device serial number...
               for (uint8_t i = 0; i < REDKEY_LEN; i++) { // ...copy serial number from device flash
-                cmd.data[REDKEY_ADD % SPM_PAGESIZE + i] = *(pred_key + 1);
+                cmd.data[REDKEY_ADD % SPM_PAGESIZE + i] = *(pred_key + i);
               }
             }
-            boot_program_page(*ppage_no, cmd.data);
+            boot_program_page(*ppage_no, cmd.data);  // Write page in buffer
             send_ans(CMD_WRITE_FLASH_PAGE, NULL, 0);
           } else {
             send_ans(ERR_CRC32_INCORRECT, NULL, 0);
@@ -48,6 +55,7 @@ int main(void) {
         }
         case CMD_KEEP_ALIVE: {
           app_countdown_stop();
+          send_ans(CMD_KEEP_ALIVE, NULL, 0);
           break;
         }
         case CMD_NOTHING_TO_DO:
@@ -74,13 +82,13 @@ uint8_t verify_app(void) {
   if (*papp_len > APP_MAXSIZE) {
     return 0;
   }
-  for (uint16_t add = 0; add < *papp_len; add += 2) {
-    uint16_t buf;
+  for (uint16_t add = 0; add < *papp_len; ++add) {
+    uint8_t buf;
     if (add == INFO_BEGIN) {
       add = INFO_END + 1;  // Skip INFO-block
     }
-    buf = *((__flash const uint16_t *) add);
-    crc = crc16(crc, (const uint8_t *)&buf, sizeof(uint16_t));
+    buf = *((__flash const uint8_t *) add);
+    crc = crc16(crc, (const uint8_t *)&buf, sizeof(uint8_t));
   }
   crc = crc >> 8 | crc << 8;
   return crc == *papp_crc;
