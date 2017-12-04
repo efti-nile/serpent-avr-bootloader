@@ -18,7 +18,7 @@ int main(void) {
   stub();  // Infinite loop for debug purposes
 #endif
   init();
-  if (verify_app()) {
+  if (verify_app(0x0000)) {
     app_countdown_start();
   } else {
     PORTC |= LED_PIN_MASK;
@@ -41,7 +41,7 @@ int main(void) {
                 cmd.data[REDKEY_ADD % SPM_PAGESIZE + i] = *(pred_key + i);
               }
             }
-            boot_program_page(*ppage_no, cmd.data);  // Write page in buffer
+            boot_program_page(*ppage_no + APP_MAXSIZE / SPM_PAGESIZE, cmd.data);  // Write page in buffer
             send_ans(CMD_WRITE_FLASH_PAGE, NULL, 0);
           } else {
             send_ans(ERR_CRC32_INCORRECT, NULL, 0);
@@ -57,6 +57,22 @@ int main(void) {
           app_countdown_stop();
           send_ans(CMD_KEEP_ALIVE, NULL, 0);
           break;
+        }
+        case CMD_COMMIT_FLASH: {
+          if (verify_app(APP_MAXSIZE)) {  // Check if FW in the buffer is correct
+            for (uint8_t page_no = 0; page_no < APP_MAXSIZE / SPM_PAGESIZE; ++page_no) {
+              // Read page from the flash buffer to RAM
+              for (uint8_t i = 0; i < SPM_PAGESIZE; ++i) {
+                cmd.data[i] = *((__flash const uint8_t *)
+                 (APP_MAXSIZE + page_no * SPM_PAGESIZE + i));
+              }
+              // Write page from RAM in application sector
+              boot_program_page(page_no, cmd.data);
+            }
+            send_ans(CMD_COMMIT_FLASH, NULL, 0);
+          } else {
+            send_ans(ERR_FW_INCORRECT, NULL, 0);
+          }
         }
         case CMD_NOTHING_TO_DO:
         default:
@@ -77,21 +93,22 @@ void init(void) {
   asm("sei");
 }
 
-uint8_t verify_app(void) {
+uint8_t verify_app(uint16_t offset) {
   uint16_t crc = 0xFFFF;
-  if (*papp_len > APP_MAXSIZE) {
+  uint16_t app_len = *(papp_len + offset / sizeof(*papp_len));
+  if (app_len > APP_MAXSIZE) {
     return 0;
   }
-  for (uint16_t add = 0; add < *papp_len; ++add) {
+  for (uint16_t add = 0 + offset; add < app_len + offset; ++add) {
     uint8_t buf;
-    if (add == INFO_BEGIN) {
-      add = INFO_END + 1;  // Skip INFO-block
+    if (add == INFO_BEGIN + offset) {
+      add = INFO_END + 1 + offset;  // Skip INFO-block
     }
     buf = *((__flash const uint8_t *) add);
     crc = crc16(crc, (const uint8_t *)&buf, sizeof(uint8_t));
   }
-  crc = crc >> 8 | crc << 8;
-  return crc == *papp_crc;
+  crc = crc >> 8 | crc << 8;  // MSB to LSB
+  return crc == *(papp_crc + offset / sizeof(*papp_crc));
 }
 
 void send_ans(cmd_opcode_t opcode, const uint8_t *data, uint8_t datalen) {
