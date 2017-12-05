@@ -9,20 +9,36 @@ volatile uint8_t is_cmd_received = 0;
 
 int main(void) {
   cmd_t cmd;
+  
   LED_DDR |= LED_PIN_MASK;
-  for (uint8_t i = 0; i < 10; ++i) {
-    LED_PORT ^= LED_PIN_MASK;
-    _delay_ms(100);
-  }
+  
 #ifdef STUB
   stub();  // Infinite loop for debug purposes
 #endif
-  init();
-  if (verify_app(0x0000)) {
+
+  // Change interrupt table
+  MCUCR = (1<<IVCE);
+  MCUCR = (1<<IVSEL);
+  asm("sei");
+  
+  // Try to launch app
+  if (verify_app(0x0000)) {  // Check application
     app_countdown_start();
   } else {
-    PORTC |= LED_PIN_MASK;
+    if (verify_app(APP_MAXSIZE)) {  // Check flash buffer for the correct application
+      write_app();
+      if (verify_app(0x0000)) {
+        app_countdown_start();
+      } else {
+        PORTC |= LED_PIN_MASK;
+      }
+    } else {
+      PORTC |= LED_PIN_MASK;
+    }
   }
+  
+  USART_init();
+  
   while (1) {
     if (is_cmd_received) {
       parse_rx_buf(&cmd);
@@ -34,18 +50,8 @@ int main(void) {
         case CMD_WRITE_FLASH_PAGE: {
           cbc_decrypt(cmd.data, cmd.datalen / CIPH_BLOCK_LEN);
           uint16_t *ppage_no = (uint16_t *)(cmd.data + SPM_PAGESIZE);
-          uint32_t *pcrc32 = (uint32_t *)(cmd.data + SPM_PAGESIZE + sizeof(*ppage_no));
-          if (*pcrc32 == crc32(cmd.data, SPM_PAGESIZE + sizeof(*ppage_no))) {
-            if (*ppage_no == REDKEY_PAGE) {  // If received page rewrites device serial number...
-              for (uint8_t i = 0; i < REDKEY_LEN; i++) { // ...copy serial number from device flash
-                cmd.data[REDKEY_ADD % SPM_PAGESIZE + i] = *(pred_key + i);
-              }
-            }
-            boot_program_page(*ppage_no + APP_MAXSIZE / SPM_PAGESIZE, cmd.data);  // Write page in buffer
-            send_ans(CMD_WRITE_FLASH_PAGE, NULL, 0);
-          } else {
-            send_ans(ERR_CRC32_INCORRECT, NULL, 0);
-          }
+          boot_program_page(*ppage_no + (APP_MAXSIZE / SPM_PAGESIZE), cmd.data);  // Write page in buffer
+          send_ans(CMD_WRITE_FLASH_PAGE, NULL, 0);
           break;
         }
         case CMD_INIT_CIPHER: {
@@ -59,17 +65,15 @@ int main(void) {
           break;
         }
         case CMD_COMMIT_FLASH: {
-          if (verify_app(APP_MAXSIZE)) {  // Check if FW in the buffer is correct
-            for (uint8_t page_no = 0; page_no < APP_MAXSIZE / SPM_PAGESIZE; ++page_no) {
-              // Read page from the flash buffer to RAM
-              for (uint8_t i = 0; i < SPM_PAGESIZE; ++i) {
-                cmd.data[i] = *((__flash const uint8_t *)
-                 (APP_MAXSIZE + page_no * SPM_PAGESIZE + i));
-              }
-              // Write page from RAM in application sector
-              boot_program_page(page_no, cmd.data);
+          if (verify_app(APP_MAXSIZE)) {  // Check if FW is correct
+            write_app();
+            if (verify_app(0x0000)) {
+              send_ans(CMD_COMMIT_FLASH, NULL, 0);
+              while (!USART_is_tx_buf_emtpty());
+              app_jump();
+            } else {
+              send_ans(ERR_FW_INCORRECT, NULL, 0);
             }
-            send_ans(CMD_COMMIT_FLASH, NULL, 0);
           } else {
             send_ans(ERR_FW_INCORRECT, NULL, 0);
           }
@@ -86,11 +90,51 @@ int main(void) {
   return 0;
 }
 
-void init(void) {
-  MCUCR = (1<<IVCE);
-  MCUCR = (1<<IVSEL);
-  USART_init();
-  asm("sei");
+void write_app(void) {
+  uint8_t page_buf[SPM_PAGESIZE];
+  uint16_t crc_new = 0xFFFF;  // to calculate new CRC with native device red key
+  uint16_t app_len = *(papp_len + APP_MAXSIZE / sizeof(*papp_len));  // new app length
+  
+  // Write in app area all pages excepting page with INFO block
+  for (uint8_t page_no = 0; page_no < APP_MAXSIZE / SPM_PAGESIZE; ++page_no) {
+    if (page_no == INFO_PAGE_NO) {
+      continue;
+    }
+    for (uint8_t i = 0; i < SPM_PAGESIZE; ++i) {
+      page_buf[i] = pgm_read_byte_near(APP_MAXSIZE + page_no * SPM_PAGESIZE + i);
+    }
+    boot_program_page(page_no, page_buf);
+  }
+    
+  // Copy page with INFO block to buffer
+  for (uint8_t i = 0; i < SPM_PAGESIZE; ++i) {
+    page_buf[i] = pgm_read_byte_near(APP_MAXSIZE + INFO_PAGE_NO * SPM_PAGESIZE + i);
+  }
+  
+  // Insert native device red key
+  for (uint8_t i = 0; i < REDKEY_LEN; ++i) {
+    page_buf[(REDKEY_ADD - INFO_PAGE_NO * SPM_PAGESIZE) + i] = pgm_read_byte_near(REDKEY_ADD + i);
+  }
+  
+  // Recalculate CRC for native key
+  for (uint8_t i = 0; i < SPM_PAGESIZE; ++i) {
+    uint8_t buf = pgm_read_byte_near(i);
+    crc_new = crc16(crc_new, (const uint8_t *)&buf, sizeof(uint8_t));
+  }
+  for (uint8_t i = INFO_END + 1 - INFO_PAGE_NO * SPM_PAGESIZE; i < SPM_PAGESIZE; ++i) {
+    crc_new = crc16(crc_new, page_buf + i, sizeof(uint8_t));
+  }  
+  for (uint16_t i = (INFO_PAGE_NO + 1) * SPM_PAGESIZE; i < app_len; ++i) {
+    uint8_t buf = pgm_read_byte_near(i);
+    crc_new = crc16(crc_new, (const uint8_t *)&buf, sizeof(uint8_t));    
+  }
+  
+  // Write CRC to buffer
+  page_buf[CRC_ADD - INFO_PAGE_NO * SPM_PAGESIZE] = (uint8_t)(crc_new >> 8);  // MSB
+  page_buf[CRC_ADD - INFO_PAGE_NO * SPM_PAGESIZE + 1] = (uint8_t)crc_new;  // LSB
+  
+  // The most dangerous operation: write new INFO block in app area
+  boot_program_page(INFO_PAGE_NO, page_buf);
 }
 
 uint8_t verify_app(uint16_t offset) {
@@ -107,7 +151,7 @@ uint8_t verify_app(uint16_t offset) {
     buf = *((__flash const uint8_t *) add);
     crc = crc16(crc, (const uint8_t *)&buf, sizeof(uint8_t));
   }
-  crc = crc >> 8 | crc << 8;  // MSB to LSB
+  crc = crc >> 8 | crc << 8;  // MSB first to LSB first
   return crc == *(papp_crc + offset / sizeof(*papp_crc));
 }
 
@@ -169,11 +213,7 @@ ISR(USART_RX_vect) {
 ISR(TIMER0_COMPA_vect) {
   static uint16_t countdown = APP_COUNTDOWN;
   if (countdown-- == 0) {
-    _delay_ms(200);
-    asm("cli");
-    MCUCR = 1 << IVCE;
-    MCUCR = 0;
-    asm("jmp 0000");
+    app_jump();
   }
   TCNT0 = 0x00;
 }
@@ -186,6 +226,16 @@ void app_countdown_start(void) {
 
 void app_countdown_stop(void) {
   TCCR0B = 0x00;
+}
+
+void app_jump(void) {
+  asm("cli");
+  MCUCR = 1 << IVCE;
+  MCUCR = 0;
+  TIMSK0 = 0x00;
+  TIMSK1 = 0x00;
+  UCSR0B = 0x00;
+  asm("jmp 0000");
 }
 
 void stub(void) {

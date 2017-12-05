@@ -7,6 +7,7 @@
 #include <util/delay.h>
 #include <avr/pgmspace.h>
 #include <string.h>
+#include <avr/wdt.h>
 #include "cbc-serpent.h"
 #include "usart.h"
 #include "crc32.h"
@@ -32,16 +33,16 @@
 
 ///
 // INFO-block
+#define INFO_PAGE_NO 1
 #define INFO_BEGIN 0x80
 #define INFO_END (0xC0 - 1)
-#define CRC_ADD 0xB4;
-#define APP_SIZE_ADD 0xB6;
+#define CRC_ADD 0xB4
+#define APP_SIZE_ADD 0xB6
 #define APP_MAXSIZE (14 * 1024)
 // Red key must be contained in one single flash page!
 // Otherwise it won't be proper restored after firmware upgrade!
 #define REDKEY_ADD 0xC0 // CONFIGURABLE 
 #define REDKEY_LEN 4 // CONFIGURABLE 
-#define REDKEY_PAGE (REDKEY_ADD/SPM_PAGESIZE)
 
 ///
 // LIN-address
@@ -74,12 +75,13 @@ typedef struct {
   uint8_t data[LIN_DATA_MAXLEN];
 } cmd_t;
 
-void init(void);
 void send_ans(cmd_opcode_t opcode, const uint8_t *data, uint8_t datalen);
 void parse_rx_buf(cmd_t *pcmd);
 uint8_t verify_app(uint16_t offset);
+void write_app(void);
 void app_countdown_start(void);
 void app_countdown_stop(void);
+void app_jump(void);
 void stub(void);
 
 #endif
