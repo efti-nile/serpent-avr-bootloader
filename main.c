@@ -10,6 +10,7 @@ volatile uint8_t is_cmd_received = 0;
 int main(void) {
   cmd_t cmd;
   
+  // Disable watchdog
   wdt_reset();
   MCUSR = 0;
   WDTCSR |= 1 << WDCE | 1 << WDE;
