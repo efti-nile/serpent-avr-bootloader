@@ -1,1 +1,1 @@
-const unsigned char version_string[] = "linboot v1.0.0 (alpha)";
+const unsigned char version_string[] = "linboot 1.0.0.A";

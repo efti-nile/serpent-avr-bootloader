@@ -15,10 +15,6 @@
 #include "crc8.h"
 #include "avr-flash.h"
 
-#ifdef DEBUG
-#warning Set DEBUG symbol. Bootloader want work properly.
-#endif
-
 #ifdef STUB
 #warning Set STUB symbol. Bootloader want work properly.
 #endif
