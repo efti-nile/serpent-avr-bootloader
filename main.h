@@ -14,6 +14,7 @@
 #include "crc16.h"
 #include "crc8.h"
 #include "avr-flash.h"
+#include "radio.h"
 
 #ifdef STUB
 #warning Set STUB symbol. Bootloader want work properly.

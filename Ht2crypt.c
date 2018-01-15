@@ -41,7 +41,7 @@
 BYTECONST exor_table[16] = {
   0, 1, 1, 0, 1, 0, 0, 1,
   1, 0, 0, 1, 0, 1, 1, 0
-};
+} ;
 
 
 
@@ -256,7 +256,7 @@ void Oneway1( BYTEPTR addr_rand )
   BYTE byte_cnt;  /* Byte counter for random/secret key.         */
   BYTE fb;        /* Feedback bit for oneway function 1.         */
   
-  for (char i = 0; i <= 5; i++) {
+  for (unsigned char i = 0; i <= 5; i++) {
     secret_key[i] = secret_key[i] ^ 0x13;
   }
   

@@ -1,8 +1,66 @@
 #ifndef RADIO_H
 #define RADIO_H
 
-// GetTransponder return values
+#include <inttypes.h>
+#include <avr/io.h>
+#include <util/delay.h>
+#include <avr/interrupt.h>
+
+#define TestPin(ADDRESS,BIT) ((ADDRESS) & (1<<(BIT)))
+#define BitTest(x, y) ((x) & (1<<(y)))   //Проверка бита y в байте x
+#define BitOn(x, y) ((x) |= (1<<(y)))    //Установка бита y в байте x
+
+
+#define MaxKeysCount 3                //Максимальное кол-во рабочих ключей
+
+
+#define OCR1A_RFID_max 1599
+
+//Счетчики времени
+volatile unsigned char Counter1;
+#define MaxCount1 100
+volatile unsigned char MilSecCounter;
+#define MaxMilSecCounter 100
+volatile unsigned char SecCounter;    //Счетчик секунд
+#define MaxSecCount 60
+volatile unsigned char MinCounter;    //Счетчик минут
+#define MaxMinCount 60
+
+#define MaxKeyCounter 3
+
+volatile unsigned char Flags;
+#define StartMessage 0x01         //0 бит -
+#define SecondFront 0x02          //1 бит -
+#define CurentBit 0x04            //2 бит -
+#define AddRedKey 0x08            //3 бит - Ждем добавления красного ключа
+#define AddWorkKey 0x10           //4 бит - Ждем добавления рабочего ключа
+#define NoRedKey 0x20             //5 бит - Нет красного ключа
+#define NoKey 0x40                //6 бит - Нет рабочего ключа
+#define TransNo 0x80              //7 бит - Пауза без транспондера
+
+#define SetFlag(y) (Flags |= (y))     //Установка бита y в байте Flags
+#define ClearFlag(y) (Flags &= (~y))  //Сброс бита y в байте Flags
+#define CheckFlag(y) (Flags & (y))    //Проверка бита y в байте Flags
+
+// GetTransponderansponder return values
 #define res_NoKey 0x00
+#define res_UnknownKey 0x01
+#define res_WorkKey 0x02
+#define res_RedKey 0x03
+#define res_MasterKey 0x04
+#define res_FreeKey 0x05
+#define res_TestKey 0x06
+#define res_NeedStop 0x09
+
+#define res_InvClose 0x0A
+#define res_InvOpen 0x0B
+#define res_InvPark 0x0C
+
+#define res_UseClose 0x1A
+#define res_UseOpen 0x1B
+#define res_UsePark 0x1C
+
+#define res_Drebezg 0x2A
 
 //Настройка приема под конктретный таймер
 #define TCNT TCNT0
@@ -34,47 +92,54 @@
 #define MISO PB4
 #define SCK PB5
 
-extern char BiteCounter;
-extern char Message[100];
-extern char AnswerLength;
-extern unsigned char data_block[8];
+extern volatile char BiteCounter;
+extern volatile char Message[100];
+extern volatile char AnswerLength;
+extern volatile unsigned char data_block[8];
 
 //unsigned char const My_ISK[6]=                 {0x4E, 0x80, 0x92, 0x41, 0x4C, 0x69};
 //unsigned char const My_Defaul_Base_Password[4]={0x4E, 0x80, 0x92, 0x41}; //Defaul Read-write device password
 //*unsigned char const My_Trans_Password[3]=      {0x1D, 0x0C, 0x07};
 //unsigned char Random[4]=                 {0x5A, 0xAB, 0xDC, 0x0F}; // Fictive random number
 
-void memcpy(unsigned char Target[], unsigned char const Source[], char Count);
-char memcmp(unsigned char const Target[], unsigned char const Source[], char Count);
-void MemToArray(unsigned char Mem[], char Array[], char First, char Count);
-void ArrayToMem(char Array[], unsigned char Mem[], char First, char Count);
-void ArrayToMemRevers(char Array[], unsigned char Mem[], char First, char Count);
+void memcpy_(unsigned char Target[], unsigned char const Source[], char Count) __attribute__((section (".RFID")));
+char memcmp_(unsigned char const Target[], unsigned char const Source[], char Count) __attribute__((section (".RFID")));
+void MemToArray(unsigned char Mem[], char Array[], char First, char Count) __attribute__((section (".RFID")));
+void ArrayToMem(char Array[], unsigned char Mem[], char First, char Count) __attribute__((section (".RFID")));
+void ArrayToMemRevers(char Array[], unsigned char Mem[], char First, char Count) __attribute__((section (".RFID")));
+
+uint32_t RFID_GetRedKeyID(void) __attribute__((section (".RFID")));
+
+void DisableRFID(void) __attribute__((section (".RFID")));
+void RFID_Init(void) __attribute__((section (".RFID")));
+void InitRadio(void) __attribute__((section (".RFID")));
+char Send_StartAuthent(void) __attribute__((section (".RFID")));
+void SetPhase(void) __attribute__((section (".RFID")));
+void FastSetPhase(void) __attribute__((section (".RFID")));
+void Send_Start(void) __attribute__((section (".RFID")));
+void Send_Stop(void) __attribute__((section (".RFID")));
+char Send_Password(void) __attribute__((section (".RFID")));
+char Send_ConfigPage() __attribute__((section (".RFID")));
+char Send_WritePage(char Nomber, unsigned char TempPage[]) __attribute__((section (".RFID")));
+char Send_ReadPage(char Nomber) __attribute__((section (".RFID")));
+
+void RFID_TIMER2_COMPA_ISR (void) __attribute__((section (".RFID")));
+void RFID_TIMER1_COMPA_ISR (void) __attribute__((section (".RFID")));
+void RFID_TIMER0_COMPA_ISR (void) __attribute__((section (".RFID")));
+void RFID_PCINT0_ISR (void) __attribute__((section (".RFID")));
+
+void SendToReader_Start(void) __attribute__((section (".RFID")));
+char SendToReaderCommand(char Command) __attribute__((section (".RFID")));
+void SendToReaderNoAnswer(char Command) __attribute__((section (".RFID")));
+void SetConfigPage(char Page, char Params) __attribute__((section (".RFID")));
+void SendToReader_Read(void) __attribute__((section (".RFID")));
+void SendToReader_Write(void) __attribute__((section (".RFID")));
+void SendToReader_Stop(void) __attribute__((section (".RFID")));
+void SendToReader(char Nomber) __attribute__((section (".RFID")));
 
 
-void InitRadio(void);
-char Send_StartAuthent(void);
-void SetPhase(void);
-void FastSetPhase(void);
-void Send_Start(void);
-void Send_Stop(void);
-char Send_Password(void);
-char Send_ConfigPage();
-char Send_WritePage(char Nomber, unsigned char TempPage[]);
-char Send_ReadPage(char Nomber);
-
-
-void SendToReader_Start(void);
-char SendToReaderCommand(char Command);
-void SendToReaderNoAnswer(char Command);
-void SetConfigPage(char Page, char Params);
-void SendToReader_Read(void);
-void SendToReader_Write(void);
-void SendToReader_Stop(void);
-void SendToReader(char Nomber);
-
-
-void Init_Manchester(void);
-void Init_Receiver(void);
+void Init_Manchester(void) __attribute__((section (".RFID")));
+void Init_Receiver(void) __attribute__((section (".RFID")));
 
 
 #define T_poweUp 315

@@ -76,7 +76,7 @@ extern BYTE s[4];  /* ... shift register */
 *                                                                           *
 ****************************************************************************/
 
-extern BYTE function_bit(void);
+extern BYTE function_bit(void)  __attribute__((section (".RFID")));
 /****************************************************************************
 *                                                                           *
 * Description:                                                              *
@@ -91,7 +91,7 @@ extern BYTE function_bit(void);
 
 
 
-extern void shift_reg( BYTE shift_bit );
+extern void shift_reg( BYTE shift_bit )  __attribute__((section (".RFID")));
 /****************************************************************************
 *                                                                           *
 * Description:                                                              *
@@ -108,7 +108,7 @@ extern void shift_reg( BYTE shift_bit );
 
 
 
-extern BYTE feed_back(void);
+extern BYTE feed_back(void)  __attribute__((section (".RFID")));
 /****************************************************************************
 *                                                                           *
 * Description:                                                              *
@@ -123,7 +123,7 @@ extern BYTE feed_back(void);
 
 
 
-extern void Oneway1( BYTEPTR addr_rand );
+extern void Oneway1( BYTEPTR addr_rand ) __attribute__((section (".RFID")));
 /****************************************************************************
 *                                                                           *
 * Description:                                                              *
@@ -161,7 +161,7 @@ extern void Oneway1( BYTEPTR addr_rand );
 
 
 
-extern void Oneway2( BYTEPTR addr, BYTE length );
+extern void Oneway2( BYTEPTR addr, BYTE length )  __attribute__((section (".RFID")));
 /****************************************************************************
 *                                                                           *
 * Description:                                                              *

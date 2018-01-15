@@ -6,6 +6,7 @@ __flash const uint16_t *papp_crc = (__flash const uint16_t *)CRC_ADD;
 __flash const uint16_t *papp_len = (__flash const uint16_t *)APP_SIZE_ADD;
 
 volatile uint8_t is_cmd_received = 0;
+volatile uint8_t is_RFID_in_progress = 0;
 
 int main(void) {
   cmd_t cmd;
@@ -17,7 +18,7 @@ int main(void) {
   WDTCSR = 0;
   
   LED_DDR |= LED_PIN_MASK;
-  
+
 #ifdef STUB
   stub();  // Infinite loop for debug purposes
 #endif
@@ -26,6 +27,21 @@ int main(void) {
   MCUCR = (1<<IVCE);
   MCUCR = (1<<IVSEL);
   asm("sei");
+  
+#ifdef RFID_TEST
+// RFID test for debug purposes
+is_RFID_in_progress = 1;
+RFID_Init();
+RFID_Enable();
+while(1) {
+  LED_PORT ^= LED_PIN_MASK;
+  uint32_t RedKeyID = RFID_GetRedKeyID();
+  if (RedKeyID != 0) {
+    LED_PORT |= LED_PIN_MASK;
+    _delay_ms(1000);
+  }
+}
+#endif  
   
   // Try to launch app
   if (verify_app(0x0000)) {  // Check application
@@ -90,7 +106,7 @@ int main(void) {
       }
       USART_rx_buf_purge();
       is_cmd_received = 0;
-      USART_enable_receiver();
+      USART_enable_receiver();  // (!)
     }
   }
   return 0;
@@ -193,11 +209,15 @@ void parse_rx_buf(cmd_t *pcmd) {
 }
 
 ISR(TIMER1_COMPA_vect) {
-  TCCR1B &= ~0x07; // stop timer
-  TCNT1 = 0x0000; // zero timer
-  TIFR1 |= 1 << OCF1A; // clear timer 1 comparator interrupt flag
-  is_cmd_received = 1;
-  USART_disable_receiver();
+  if (!is_RFID_in_progress) {
+    TCCR1B &= ~0x07; // stop timer
+    TCNT1 = 0x0000; // zero timer
+    TIFR1 |= 1 << OCF1A; // clear timer 1 comparator interrupt flag
+    is_cmd_received = 1;
+    USART_disable_receiver();
+  } else {
+    RFID_TIMER1_COMPA_ISR();
+  }  
 }
 
 ISR(USART_RX_vect) {
@@ -217,11 +237,23 @@ ISR(USART_RX_vect) {
 }
 
 ISR(TIMER0_COMPA_vect) {
-  static uint16_t countdown = APP_COUNTDOWN;
-  if (countdown-- == 0) {
-    app_jump();
-  }
-  TCNT0 = 0x00;
+  if (!is_RFID_in_progress) {
+    static uint16_t countdown = APP_COUNTDOWN;
+    if (countdown-- == 0) {
+      app_jump();
+    }
+    TCNT0 = 0x00;
+  } else {
+    RFID_TIMER0_COMPA_ISR();
+  }    
+}
+
+ISR(PCINT0_vect) {
+  RFID_PCINT0_ISR();
+}  
+  
+ISR(TIMER2_COMPA_vect) {
+  RFID_TIMER2_COMPA_ISR();
 }
 
 void app_countdown_start(void) {
