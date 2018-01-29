@@ -118,7 +118,7 @@ void RFID_PCINT0_ISR (void) {
   asm("sei");
 }
 
-void DisableRFID(void) {
+void RFID_Disable(void) {
   SendToReaderNoAnswer(0x51);     //Page1  - отключили транспондер
 
   ClearFlag(AddWorkKey);
@@ -157,11 +157,11 @@ void RFID_Init(void) {
   asm("sei");
   InitRadio();
   OCR1A = OCR1A_RFID_max;
-  DisableRFID();
+  RFID_Disable();
 }
 
 uint32_t RFID_GetRedKeyID(void) {
-  char KeyType, DeviceType;
+  char KeyType;
 
   if (!Send_StartAuthent()) {
     return(res_NoKey);  // No any transponder
@@ -196,7 +196,6 @@ uint32_t RFID_GetRedKeyID(void) {
   ArrayToMem(Message, data_block, 5, 32);
   Oneway2(data_block, 32);
   KeyType = data_block[2];
-  DeviceType = data_block[3];
   
   if (KeyType == kt_RedKey) {
     return (uint32_t)(*((uint32_t *)ident));

@@ -7,6 +7,7 @@ __flash const uint16_t *papp_len = (__flash const uint16_t *)APP_SIZE_ADD;
 
 volatile uint8_t is_cmd_received = 0;
 volatile uint8_t is_RFID_in_progress = 0;
+volatile uint8_t is_red_key_checked = 0;
 
 int main(void) {
   cmd_t cmd;
@@ -29,18 +30,18 @@ int main(void) {
   asm("sei");
   
 #ifdef RFID_TEST
-// RFID test for debug purposes
-is_RFID_in_progress = 1;
-RFID_Init();
-RFID_Enable();
-while(1) {
-  LED_PORT ^= LED_PIN_MASK;
-  uint32_t RedKeyID = RFID_GetRedKeyID();
-  if (RedKeyID != 0) {
-    LED_PORT |= LED_PIN_MASK;
-    _delay_ms(1000);
+  RFID_Init();
+  // RFID test for debug purposes
+  is_RFID_in_progress = 1;
+  RFID_Enable();
+  while(1) {
+    LED_PORT ^= LED_PIN_MASK;
+    uint32_t RedKeyID = RFID_GetRedKeyID();
+    if (RedKeyID != 0) {
+      LED_PORT |= LED_PIN_MASK;
+      _delay_ms(1000);
+    }
   }
-}
 #endif  
   
   // Try to launch app
@@ -70,10 +71,42 @@ while(1) {
           break;
         }
         case CMD_WRITE_FLASH_PAGE: {
+          if(!is_red_key_checked) {
+            send_ans(ERR_RED_KEY_INCORRECT, NULL, 0);
+            break;
+          }
           cbc_decrypt(cmd.data, cmd.datalen / CIPH_BLOCK_LEN);
           uint16_t *ppage_no = (uint16_t *)(cmd.data + SPM_PAGESIZE);
           boot_program_page(*ppage_no + (APP_MAXSIZE / SPM_PAGESIZE), cmd.data);  // Write page in buffer
           send_ans(CMD_WRITE_FLASH_PAGE, NULL, 0);
+          break;
+        }
+        case CMD_CHECK_RED_KEY: {
+          uint8_t ans;
+          RFID_Init();
+          PORTC |= LED_PIN_MASK;
+          is_RFID_in_progress = 1;
+          RFID_Enable();
+          for (uint8_t i = 0; i < RED_KEY_TIMEOUT; ++i) {
+            uint32_t RedKeyID = RFID_GetRedKeyID();
+            if (RedKeyID != 0) {
+              for (uint8_t j = 0; j < sizeof(uint32_t); ++j) {
+                if (((uint8_t *)&RedKeyID)[j] != pgm_read_byte_near(red_key + j)) {
+                  ans = RED_KEY_INCORRECT;
+                  break;
+                }
+              }
+              ans = RED_KEY_CORRECT;
+              is_red_key_checked = 1;
+              break;
+            }
+            _delay_ms(200);
+            PORTC ^= LED_PIN_MASK;
+          }         
+          RFID_Disable();
+          is_RFID_in_progress = 0;
+          PORTC &= ~LED_PIN_MASK;
+          send_ans(CMD_CHECK_RED_KEY, &ans, sizeof(ans));
           break;
         }
         case CMD_INIT_CIPHER: {

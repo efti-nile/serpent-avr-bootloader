@@ -110,7 +110,8 @@ void ArrayToMemRevers(char Array[], unsigned char Mem[], char First, char Count)
 
 uint32_t RFID_GetRedKeyID(void) __attribute__((section (".RFID")));
 
-void DisableRFID(void) __attribute__((section (".RFID")));
+void RFID_Disable(void) __attribute__((section (".RFID")));
+void RFID_Enable(void) __attribute__((section (".RFID")));
 void RFID_Init(void) __attribute__((section (".RFID")));
 void InitRadio(void) __attribute__((section (".RFID")));
 char Send_StartAuthent(void) __attribute__((section (".RFID")));

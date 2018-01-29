@@ -16,11 +16,14 @@
 #include "avr-flash.h"
 #include "radio.h"
 
+__attribute__((used, section (".REDKEY"))) uint8_t red_key[4] = {0xE4, 0x68, 0xE9, 0x1A};
+
 #ifdef STUB
 #warning Set STUB symbol. Bootloader want work properly.
 #endif
 
 #define APP_COUNTDOWN 500  // Delay before branch to the application, * 10 ms
+#define RED_KEY_TIMEOUT (30*5)  // Timeout to check red key,  * 200 ms
 
 ///
 // Pinout
@@ -35,7 +38,7 @@
 #define INFO_END (0xC0 - 1)
 #define CRC_ADD 0xB4
 #define APP_SIZE_ADD 0xB6
-#define APP_MAXSIZE (14 * 1024)
+#define APP_MAXSIZE (12152)
 // Red key must be contained in one single flash page!
 // Otherwise it won't be proper restored after firmware upgrade!
 #define REDKEY_ADD 0xC0 // CONFIGURABLE 
@@ -63,8 +66,15 @@ typedef enum {
   CMD_NOTHING_TO_DO,
   CMD_KEEP_ALIVE,
   CMD_COMMIT_FLASH,
-  ERR_FW_INCORRECT
+  ERR_FW_INCORRECT,
+  CMD_CHECK_RED_KEY,
+  ERR_RED_KEY_INCORRECT
 } cmd_opcode_t;
+
+typedef enum {
+  RED_KEY_CORRECT = 49,
+  RED_KEY_INCORRECT = 48
+} data_constant_t;
 
 typedef struct {
   cmd_opcode_t opcode;
@@ -73,7 +83,7 @@ typedef struct {
 } cmd_t;
 
 void send_ans(cmd_opcode_t opcode, const uint8_t *data, uint8_t datalen);
-void parse_rx_buf(cmd_t *pcmd);
+void parse_rx_buf(cmd_t *pcmd)  __attribute__((section (".RFID")));
 uint8_t verify_app(uint16_t offset);
 void write_app(void);
 void app_countdown_start(void);
