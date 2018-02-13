@@ -17,6 +17,7 @@
 #include "radio.h"
 
 __attribute__((used, section (".REDKEY"))) uint8_t red_key[4] = {0xE4, 0x68, 0xE9, 0x1A};
+#define REDKEY_BTLDR_ADD 0x7FFC
 
 #ifdef STUB
 #warning Set STUB symbol. Bootloader want work properly.
@@ -38,7 +39,7 @@ __attribute__((used, section (".REDKEY"))) uint8_t red_key[4] = {0xE4, 0x68, 0xE
 #define INFO_END (0xC0 - 1)
 #define CRC_ADD 0xB4
 #define APP_SIZE_ADD 0xB6
-#define APP_MAXSIZE (12152)
+#define APP_MAXSIZE 12032
 // Red key must be contained in one single flash page!
 // Otherwise it won't be proper restored after firmware upgrade!
 #define REDKEY_ADD 0xC0 // CONFIGURABLE 

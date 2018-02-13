@@ -1,7 +1,6 @@
 #include "main.h"
 #include "version-string.inc"
 
-__flash const uint8_t *pred_key = (__flash const uint16_t *)REDKEY_ADD;
 __flash const uint16_t *papp_crc = (__flash const uint16_t *)CRC_ADD;
 __flash const uint16_t *papp_len = (__flash const uint16_t *)APP_SIZE_ADD;
 
@@ -18,7 +17,7 @@ int main(void) {
   WDTCSR |= 1 << WDCE | 1 << WDE;
   WDTCSR = 0;
   
-  LED_DDR |= LED_PIN_MASK;
+  LED_DDR |= LED_PIN_MASK;  // LED pin set to output
 
 #ifdef STUB
   stub();  // Infinite loop for debug purposes
@@ -46,17 +45,17 @@ int main(void) {
   
   // Try to launch app
   if (verify_app(0x0000)) {  // Check application
-    app_countdown_start();
+    app_countdown_start();  // Start countdown if app is ok
   } else {
     if (verify_app(APP_MAXSIZE)) {  // Check flash buffer for the correct application
-      write_app();
+      write_app();  // If there is correct app -- write it in main memory
       if (verify_app(0x0000)) {
         app_countdown_start();
       } else {
-        PORTC |= LED_PIN_MASK;
+        PORTC |= LED_PIN_MASK;  // Turned on LED warns about broken app
       }
     } else {
-      PORTC |= LED_PIN_MASK;
+      PORTC |= LED_PIN_MASK;  // Turned on LED warns about broken app
     }
   }
   
@@ -168,7 +167,7 @@ void write_app(void) {
   
   // Insert native device red key
   for (uint8_t i = 0; i < REDKEY_LEN; ++i) {
-    page_buf[(REDKEY_ADD - INFO_PAGE_NO * SPM_PAGESIZE) + i] = pgm_read_byte_near(REDKEY_ADD + i);
+    page_buf[(REDKEY_ADD - INFO_PAGE_NO * SPM_PAGESIZE) + i] = pgm_read_byte_near(REDKEY_BTLDR_ADD + i);
   }
   
   // Recalculate CRC for native key
@@ -259,7 +258,7 @@ ISR(USART_RX_vect) {
     if (rx_byte == LIN_ADD) { // if device address received
 	    // OCR1A = 4818;
       TIMSK1 |= 1 << OCIE1A; // enable timer A compare interrupt
-      OCR1A =  (uint16_t)(((double)LIN_MSG_MAXLEN * 2.0 * 10.0 / (double)USART_BAUD)\
+      OCR1A =  (uint16_t)(((double)LIN_MSG_MAXLEN * 2.0 * 10.0 / (double)USART_BAUD)
         * ((double)F_CPU / 1024.0)); // set timeout
       TCCR1B |= 0x05; // start timer at F_CPU/1024. Overflow every ~16 ms @ F_CPU == 16 MHz
       USART_rx_buf_put((uint8_t const *)&rx_byte, 1);
