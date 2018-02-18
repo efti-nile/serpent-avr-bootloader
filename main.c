@@ -27,6 +27,12 @@ int main(void) {
   MCUCR = (1<<IVCE);
   MCUCR = (1<<IVSEL);
   asm("sei");
+
+  // Read version from flash to send it on CMD_SEND_BTLDR_VERS command
+  for (uint8_t i = 0; i < VERSION_STRING_LEN; ++i) {
+    version_string[i] = pgm_read_byte_near(&version_string_flash[i]);
+  }
+  version_string[VERSION_STRING_LEN - 1] = '\0';
   
 #ifdef RFID_TEST
   RFID_Init();

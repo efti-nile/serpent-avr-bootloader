@@ -5,5 +5,5 @@
 
 #include <inttypes.h>
 
-unsigned char crc8(uint8_t crc, const uint8_t *data, uint8_t len);
+unsigned char crc8(uint8_t crc, const uint8_t *data, uint8_t len)  __attribute__((section (".RFID")));
 #endif

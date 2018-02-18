@@ -19,6 +19,10 @@
 __attribute__((used, section (".REDKEY"))) uint8_t red_key[4] = {0xE4, 0x68, 0xE9, 0x1A};
 #define REDKEY_BTLDR_ADD 0x7FFC
 
+// SRAM buffer to read the version number from flash. The version specified in version-string.inc file.
+#define VERSION_STRING_LEN 9
+uint8_t version_string[VERSION_STRING_LEN];
+
 #ifdef STUB
 #warning Set STUB symbol. Bootloader want work properly.
 #endif
